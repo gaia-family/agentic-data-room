@@ -3,6 +3,12 @@ import { GoogleAuth } from 'google-auth-library';
 const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_KEY || '{}');
 const rootFolderId = process.env.DRIVE_ROOT_FOLDER_ID;
 
+const DRIVE_ID = /^[A-Za-z0-9_-]+$/;
+function assertDriveId(id) {
+  if (!DRIVE_ID.test(String(id || ''))) throw new Error('Unknown file');
+  return id;
+}
+
 const auth = new GoogleAuth({
   credentials,
   scopes: ['https://www.googleapis.com/auth/drive.readonly'],
@@ -71,6 +77,7 @@ export async function listFolders() {
  * List immediate subfolders of any folder.
  */
 export async function listSubfolders(folderId) {
+  assertDriveId(folderId);
   const url = `https://www.googleapis.com/drive/v3/files?q='${folderId}'+in+parents+and+mimeType='application/vnd.google-apps.folder'+and+trashed=false&fields=files(id,name)&orderBy=name&supportsAllDrives=true&includeItemsFromAllDrives=true`;
   return driveListAll(url);
 }
@@ -79,6 +86,7 @@ export async function listSubfolders(folderId) {
  * List files (non-folders) directly inside a folder — no recursion.
  */
 export async function listFiles(folderId) {
+  assertDriveId(folderId);
   const url = `https://www.googleapis.com/drive/v3/files?q='${folderId}'+in+parents+and+mimeType!='application/vnd.google-apps.folder'+and+trashed=false&fields=files(id,name,mimeType,size,modifiedTime)&orderBy=name&supportsAllDrives=true&includeItemsFromAllDrives=true`;
   const raw = await driveListAll(url);
   return raw.map((f) => ({
@@ -113,11 +121,6 @@ export async function listFilesRecursive(folderId, pathSegments = []) {
   return [...filesWithPath, ...nested.flat()];
 }
 
-const DRIVE_ID = /^[A-Za-z0-9_-]+$/;
-function assertDriveId(id) {
-  if (!DRIVE_ID.test(String(id || ''))) throw new Error('Unknown file');
-  return id;
-}
 
 /**
  * Walk parents up to the data room root and return the top-level folder id.

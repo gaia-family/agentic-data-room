@@ -8,7 +8,14 @@ function authSecret() {
   }
   return 'dev-secret-change-me';
 }
-const SECRET = new TextEncoder().encode(authSecret());
+// Resolved on first use, not at import time, so `next build` (which loads
+// route modules without runtime env) does not need the secret; the first
+// request in production still fails loudly if it is missing.
+let _secret;
+function secret() {
+  if (!_secret) _secret = new TextEncoder().encode(authSecret());
+  return _secret;
+}
 
 const COOKIE_NAME = 'gdr_session';
 
@@ -21,7 +28,7 @@ export async function createSession(email, name) {
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
     .setExpirationTime('7d')
-    .sign(SECRET);
+    .sign(secret());
 }
 
 /**
@@ -29,7 +36,7 @@ export async function createSession(email, name) {
  */
 export async function verifySession(token) {
   try {
-    const { payload } = await jwtVerify(token, SECRET);
+    const { payload } = await jwtVerify(token, secret());
     return payload;
   } catch {
     return null;
